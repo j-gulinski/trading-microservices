@@ -17,14 +17,17 @@ last_event_timestamp = None
 
 spots = {
     "ACME":   {"symbol": "ACME",   "asset_class": "EQUITY",    "currency": "USD",
-               "bid": 99.95, "ask": 100.05, "mid": 100.00, "last": 100.00, "spot": None},
-    "XAUUSD": {"symbol": "XAUUSD", "asset_class": "COMMODITY", "curdockerrency": "USD",
+               "bid": 99.95, "ask": 100.05, "mid": 100.00, "last": 100.00, "spot": None,
+               "implied_vol": 0.20},
+    "XAUUSD": {"symbol": "XAUUSD", "asset_class": "COMMODITY", "currency": "USD",
                "bid": None, "ask": None, "mid": None, "last": 2000.00, "spot": 2000.00},
     "ES_FUT": {"symbol": "ES_FUT", "asset_class": "FUTURES",   "currency": "USD",
                "bid": None, "ask": None, "mid": None, "last": 5000.00, "spot": 5000.00},
     "EURUSD": {"symbol": "EURUSD", "asset_class": "FX",        "currency": "USD",
                "bid": None, "ask": None, "mid": None, "last": None, "spot": 1.16,
                "domestic_rate": 0.0375, "foreign_rate": 0.0215},
+    "MARKET_INDEX": {"symbol": "MARKET_INDEX", "asset_class": "INDEX", "currency": "USD",
+                     "bid": None, "ask": None, "mid": None, "last": 1000.00, "spot": 1000.00},
 }
 
 CURVE_TENORS = [0.5, 1.0, 2.0, 3.0, 5.0, 7.0, 10.0]

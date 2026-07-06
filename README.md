@@ -110,6 +110,38 @@ generated/manual intent -> trade-action (queue+worker) -> Trades (ACTIVE)
 
 ---
 
+## Market data & simulation decisions
+
+The generator streams one tick per instrument (ACME, XAUUSD, ES_FUT, EURUSD),
+the `USD_GOV` yield curve, and two additions made for the PD4 scope:
+
+- **`MARKET_INDEX` (benchmark for book alpha/beta).** One synthetic index for
+  the whole market; a production system would use a per-mandate benchmark per
+  book (equity index for equity books, rates index for bond books, ...).
+  It is an **equal-weighted basket** of the risky spot instruments
+  (ACME / XAUUSD / ES_FUT, rebased to 1000 at the seed prices) rather than
+  independent noise -- book PnL then genuinely co-moves with the benchmark, so
+  book-level betas are meaningful instead of hovering near zero. FX and rates
+  are excluded (different return dynamics). `INDEX` is deliberately **not**
+  added to the `AssetClass` enum: it is market data only, not tradeable, so
+  books and trade generation can never pick it up.
+- **Implied volatility (Black-Scholes input for European options).** A flat
+  vol per underlying -- no smile/surface -- carried **on the underlying's own
+  tick** (`implied_vol` on the ACME tick), the same way FX ticks already carry
+  their rates; no separate vol stream or table needed. It follows a small
+  random walk clamped to [5%, 80%], so option fair values will move with vol
+  (vega PnL), not only with spot.
+- **One curve for all discounting.** Bonds (and IRS, when added) discount off
+  the existing `USD_GOV` curve; there is no second curve, because it would be
+  the same tenors/rates shape and interpolation without adding a new concept.
+  This is the classic single-curve simplification (market practice pre-2008);
+  production systems separate the discounting (OIS) curve from the projection
+  curve. To keep exactly one discounting convention,
+  `shared/pricing_math.py` exposes `discount_factor(t) = 1 / (1 + r(t))^t`
+  and `bond_pv` uses it.
+
+---
+
 ## SSE
 
 Both `/stream` (market data) and `/valuation-stream` (valuations) are
@@ -174,14 +206,11 @@ Every service writes audit events:
 
 Audit today is written **inline**: the audit row goes to the DB as part of
 handling the event. When there is a business write it joins that write's
-transaction (the `session=` argument) so they commit atomically -- one commit /
-one `fsync` covers both rows.audit_logs` table
-directly and the write sits on the business path.
+transaction
 
 ### Possible extension: file-forwarded audit
 
-A lighter-weight alternative (full write-up in `docs/audit-improvements.md`):
-services stop writing `audit_logs` directly and instead **emit each audit event
+A lighter-weight alternative services stop writing `audit_logs` directly and instead **emit each audit event
 as a structured log line**; a separate **audit-forwarder** tails those log files
 and batch-inserts them into `audit_logs`.
  The `audit_logs` table and the blotter's `/trades/<id>/audit-logs` read path stay

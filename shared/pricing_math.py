@@ -14,6 +14,10 @@ def rate_at(tenors, rates, t):
     return rates[-1]
 
 
+def discount_factor(tenors, rates, t):
+    return 1.0 / (1 + rate_at(tenors, rates, t)) ** t
+
+
 def bond_pv(meta, curve):
     face = meta["face_value"]
     ppy = meta["payments_per_year"]
@@ -22,7 +26,6 @@ def bond_pv(meta, curve):
     pv = 0.0
     for i in range(1, periods + 1):
         t = i / ppy
-        r = rate_at(curve["tenors"], curve["rates"], t)
         cashflow = coupon + (face if i == periods else 0.0)
-        pv += cashflow / (1 + r) ** t
+        pv += cashflow * discount_factor(curve["tenors"], curve["rates"], t)
     return pv

@@ -14,6 +14,12 @@ log = get_logger(SERVICE_NAME)
 
 VOL = 0.0002
 CURVE_VOL = 0.00005
+IMPLIED_VOL_STEP = 0.005
+IMPLIED_VOL_MIN, IMPLIED_VOL_MAX = 0.05, 0.80
+
+INDEX_BASE_LEVEL = 1000.0
+INDEX_BASKET = {"ACME": "mid", "XAUUSD": "spot", "ES_FUT": "last"}
+_INDEX_BASE_PRICES = {s: float(persistence.spots[s][f]) for s, f in INDEX_BASKET.items()}
 
 
 def _dec(value: float, places: int = 4) -> Decimal:
@@ -21,8 +27,10 @@ def _dec(value: float, places: int = 4) -> Decimal:
 
 
 def generate_equity_tick():
-    mid = max(1.0, float(persistence.spots["ACME"]["mid"]) * (1 + random.uniform(-VOL, VOL)))
+    prev = persistence.spots["ACME"]
+    mid = max(1.0, float(prev["mid"]) * (1 + random.uniform(-VOL, VOL)))
     half_spread = mid * 0.0005
+    implied_vol = float(prev["implied_vol"]) * (1 + random.uniform(-IMPLIED_VOL_STEP, IMPLIED_VOL_STEP))
     return {
         "symbol": "ACME", "asset_class": "EQUITY", "currency": "USD",
         "bid": _dec(mid - half_spread),
@@ -30,6 +38,7 @@ def generate_equity_tick():
         "mid": _dec(mid),
         "last": _dec(mid),
         "spot": None,
+        "implied_vol": _dec(min(IMPLIED_VOL_MAX, max(IMPLIED_VOL_MIN, implied_vol))),
     }
 
 
@@ -65,6 +74,17 @@ def generate_fx_tick():
     }
 
 
+def generate_index_tick():
+    ratios = [float(persistence.spots[s][f]) / _INDEX_BASE_PRICES[s] for s, f in INDEX_BASKET.items()]
+    level = INDEX_BASE_LEVEL * sum(ratios) / len(ratios)
+    return {
+        "symbol": "MARKET_INDEX", "asset_class": "INDEX", "currency": "USD",
+        "bid": None, "ask": None, "mid": None,
+        "last": _dec(level),
+        "spot": _dec(level),
+    }
+
+
 def generate_curve_tick():
     rates = [round(anchor + random.uniform(-CURVE_VOL, CURVE_VOL), 6) for anchor in persistence.CURVE_ANCHOR]
     return {
@@ -78,6 +98,7 @@ GENERATORS = [
     ("market_tick", "spot",  "XAUUSD",  generate_commodity_tick),
     ("market_tick", "spot",  "ES_FUT",  generate_futures_tick),
     ("market_tick", "spot",  "EURUSD",  generate_fx_tick),
+    ("market_tick", "spot",  "MARKET_INDEX", generate_index_tick),
     ("curve_tick",  "curve", "USD_GOV", generate_curve_tick),
 ]
 
