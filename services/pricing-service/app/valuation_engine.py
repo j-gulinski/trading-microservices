@@ -6,7 +6,7 @@ from app.pnl import compute_pnl
 from app.valuation_publisher import publish_valuation
 from app.config import TRADE_REFRESH_SECONDS, SERVICE_NAME
 from shared.functions import get_iso_timestamp
-from shared.pricing_math import bond_pv, fx_forward
+from shared.pricing_math import black_scholes_price, bond_pv, fx_forward, rate_at
 from shared.logging_config import get_logger
 
 log = get_logger(SERVICE_NAME)
@@ -41,6 +41,22 @@ def _current_price_and_mult(trade):
         if not curve:
             return None, None
         return Decimal(str(bond_pv(meta, curve))), 1
+
+    if asset_class == "EUROPEAN_OPTION":
+        spot = cache.get_spot(meta.get("underlying_symbol"))
+        curve = cache.get_curve(meta.get("curve", "USD_GOV"))
+        if not spot or spot.get("implied_vol") is None or not curve:
+            return None, None
+        underlying = spot.get("mid") or spot.get("last") or spot.get("spot")
+        if underlying is None:
+            return None, None
+        T = float(meta["maturity_years"])  # static time-to-expiry, see README
+        r = rate_at(curve["tenors"], curve["rates"], T)
+        premium = black_scholes_price(
+            float(underlying), float(meta["strike"]), r,
+            float(spot["implied_vol"]), T, meta["option_type"],
+        )
+        return Decimal(str(round(premium, 4))), 1
 
     return None, None
 

@@ -35,4 +35,22 @@ INSTRUMENT_CATALOG = {
         "currency": "USD",
         "multiplier": 50
     },
+    "ACME_CALL_100": {
+        "asset_class": "EUROPEAN_OPTION",
+        "currency": "USD",
+        "underlying_symbol": "ACME",
+        "option_type": "CALL",
+        "strike": 100.0,
+        "maturity_years": 0.5,
+        "curve": "USD_GOV",
+    },
+    "ACME_PUT_100": {
+        "asset_class": "EUROPEAN_OPTION",
+        "currency": "USD",
+        "underlying_symbol": "ACME",
+        "option_type": "PUT",
+        "strike": 100.0,
+        "maturity_years": 0.5,
+        "curve": "USD_GOV",
+    },
 }

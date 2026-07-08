@@ -47,7 +47,9 @@ def get_curve(name):
 
 def trades_for_symbol(symbol):
     with data_lock:
-        return [t for t in active_trades.values() if t["symbol"] == symbol]
+        return [t for t in active_trades.values()
+                if t["symbol"] == symbol
+                or (t.get("metadata") or {}).get("underlying_symbol") == symbol]
 
 
 def bond_trades():

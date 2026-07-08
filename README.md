@@ -170,11 +170,15 @@ A simulated order source. It seeds one default book per asset class via Books
 Service on startup, then a single background loop generates intents
 and posts them to trade-action (the only writer of `Trades`):
 
-- Each cycle picks a random book, prices its instrument off the market-data
-  `/snapshot` (bonds are PV'd off the `USD_GOV` curve), picks a random side, and
-  sizes `quantity` to a **target notional** (`TARGET_NOTIONAL`) so every asset
-  class carries comparable exposure -- otherwise the futures multiplier would
-  dwarf everyone else's PnL.
+- Each cycle picks a random book, then a **random instrument of that book's
+  asset class** (so both bonds trade, and calls as well as puts), prices it off
+  the market-data `/snapshot` (bonds PV'd off the `USD_GOV` curve, option
+  premiums via Black-Scholes), picks a random side, and sizes `quantity` to a
+  **target notional** (`TARGET_NOTIONAL`) so every asset class carries
+  comparable exposure -- otherwise the futures multiplier would dwarf everyone
+  else's PnL. Options are sized on the **underlying's** price, not the premium:
+  premium-based sizing would give the option book several times everyone
+  else's market exposure.
 - ~`CLOSE_PROBABILITY` of cycles close a tracked open trade instead.
 - The loop is **off by default**; `POST /start` / `POST /stop` toggle it (a
   `threading.Event`), `POST /generate-once` fires a single cycle. Open trade ids
@@ -237,7 +241,8 @@ reads the line, that audit event is gone and there is no business transaction to
 | EQUITY / COMMODITY | `price * qty` | price = mid/last/spot |
 | FUTURES | `price * multiplier * qty` | `multiplier` from metadata |
 | FX (forward) | `forward * qty` | `forward = spot*(1+r_d*T)/(1+r_f*T)` |
-| BOND | `sum CF_t / (1+r(t))^t * qty` | rate interpolated off the `USD_GOV` curve |
+| BOND | `sum CF_t * DF(t) * qty` | `DF(t) = 1/(1+r(t))^t`, rate interpolated off `USD_GOV` |
+| EUROPEAN_OPTION | `BS premium * qty` | Black-Scholes; inputs below |
 
 PnL sign depends on side -- the classic domain bug:
 - BUY: `unrealized = (current - trade) * qty * multiplier`
@@ -245,6 +250,53 @@ PnL sign depends on side -- the classic domain bug:
 
 Pricing owns **all** PnL math (one place for the signs). Realized PnL is
 finalized on close (`unrealized=0`, `total=realized`).
+
+### European options (Black-Scholes)
+
+`shared/pricing_math.py::black_scholes_price` -- closed-form Black-Scholes,
+`normal_cdf` built on `math.erf` (no scipy, per the assignment).
+
+**Why this model.** An option's value = intrinsic value (what exercising now
+would be worth) + time value (the chance the underlying moves in your favour
+before expiry, with downside capped at the premium). Black-Scholes is the
+standard closed-form way to price that time value for *European* options
+(exercise only at expiry -- exactly our instrument): a single formula, no
+simulation or lattice needed, so it fits a per-tick revaluation loop. The
+assumptions it buys that simplicity with (constant vol and rate, lognormal
+underlying, no dividends) are all true *by construction* in this simulator --
+the generator literally produces a flat vol and small lognormal-ish steps --
+so here the model is not even an approximation of the market, it *is* the
+market.
+
+**Inputs and where each lives:**
+
+| Input | Source |
+|---|---|
+| `S` underlying price | `mid/last/spot` of the underlying's tick (e.g. ACME) |
+| `K` strike, `T` maturity, CALL/PUT | `trades.metadata` (copied from the catalog at open) |
+| `sigma` implied vol | `implied_vol` on the underlying's tick |
+| `r` risk-free rate | interpolated off `USD_GOV` at `T` |
+
+**What moves the premium** (why the stream is interesting to watch): spot moves
+-> delta PnL (calls up when spot up, puts down); implied vol moves -> vega PnL
+(both options richer when vol rises -- this is why vol is market *data*, not a
+constant); rates -> small rho effect. Sanity anchors at seed data
+(S=K=100, r~3%, vol~20%, T=0.5): call ~ **6.4**, put ~ **4.9**.
+
+**Static time-to-expiry (deliberate simplification).** `T` is frozen at the
+catalog's `maturity_years`; the option does not age. Real theta decay over a
+demo session is invisible anyway (10 minutes ~ 2e-5 years -> ~0.0001 premium
+drift, below our 4-decimal rounding), and a static `T` keeps open, live and
+close valuations perfectly consistent -- trade-generation prices the open and
+the close with the same `T` the pricing engine uses. Upgrade path if aging ever
+matters: store `expiry = opened_at + maturity_years` and compute `T` per tick.
+
+**Revaluation trigger:** an underlying tick revalues the trades *on* that
+symbol and all derivatives *of* it (`cache.trades_for_symbol` matches
+`metadata.underlying_symbol` too), so ACME ticks reprice `ACME_CALL_100` /
+`ACME_PUT_100`. PnL reuses the same `compute_pnl` as everything else: the
+premium is just the option's price (BUY call profits when premium rises, SELL
+put profits when the put cheapens -- no option-specific sign logic).
 
 ---
 
@@ -263,6 +315,7 @@ gains when value rises, a short when it falls).
 |---|---|---|
 | EQUITY / COMMODITY / FUTURES / FX | decimal percentage (`0.10` = +10%) | spot / forward price |
 | BOND | basis points (`25` = +25 bps) | every tenor on the `USD_GOV` curve, then re-PV |
+| EUROPEAN_OPTION | decimal percentage | the **underlying** spot; premium impact = full BS repricing (curvature/gamma included, not a linear delta approximation), added to the base premium like the bond curve delta |
 
 - `instrument.current_price` (the `base_price`) is the base when supplied (omit
   it to pull the live price from the pricing cache). It's honoured for every asset
@@ -341,5 +394,7 @@ confirms it's still ACTIVE -- this also drops stale post-close ticks).
   loop, read the blotter, then flatten everything with `/trade-actions/close-all`
 - `scenario-analysis.http` -- `POST /scenario` shocks, one per asset class
   (equity/commodity/futures/FX percentage shocks, bond bps curve shock)
+- `options.http` -- European options end-to-end: ATM call + put, live premium
+  valuation, underlying shocks via `/scenario`, close -> realized PnL
 
 ---

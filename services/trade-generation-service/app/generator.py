@@ -12,7 +12,9 @@ from app.config import SERVICE_NAME, CLOSE_PROBABILITY, TRADE_GENERATION_INTERVA
 
 log = get_logger(SERVICE_NAME)
 
-SYMBOL_BY_CLASS = {terms["asset_class"]: symbol for symbol, terms in INSTRUMENT_CATALOG.items()}
+SYMBOLS_BY_CLASS = {}
+for _symbol, _terms in INSTRUMENT_CATALOG.items():
+    SYMBOLS_BY_CLASS.setdefault(_terms["asset_class"], []).append(_symbol)
 
 _running = threading.Event()
 _lock = threading.Lock()
@@ -36,7 +38,7 @@ def _build_open(snapshot: dict) -> dict | None:
         if not _books:
             return None
         asset_class, book_id = random.choice(list(_books.items()))
-    symbol = SYMBOL_BY_CLASS[asset_class]
+    symbol = random.choice(SYMBOLS_BY_CLASS[asset_class])
     terms = INSTRUMENT_CATALOG[symbol]
     price = market_data_client.current_price(snapshot, symbol, terms)
     if price is None:
@@ -48,11 +50,22 @@ def _build_open(snapshot: dict) -> dict | None:
         "asset_class": asset_class,
         "symbol": symbol,
         "side": random.choice(["BUY", "SELL"]),
-        "quantity": _size_quantity(price, terms.get("multiplier", 1)),
+        "quantity": _size_quantity(_sizing_basis(snapshot, terms, price), terms.get("multiplier", 1)),
         "trade_price": str(price.quantize(Decimal("0.0001"))),
         "currency": terms.get("currency", "USD"),
         "source": "GENERATED",
     }
+
+
+def _sizing_basis(snapshot: dict, terms: dict, price: Decimal) -> Decimal:
+    # options are sized on the underlying's exposure, not the premium --
+    # sizing on the (much smaller) premium would give the option book several
+    # times the market exposure of every other book
+    if terms["asset_class"] != "EUROPEAN_OPTION":
+        return price
+    spot = (snapshot.get("spots") or {}).get(terms["underlying_symbol"]) or {}
+    underlying = spot.get("mid") or spot.get("last") or spot.get("spot")
+    return Decimal(str(underlying)) if underlying is not None else price
 
 
 def _size_quantity(price: Decimal, multiplier: int) -> int:

@@ -3,7 +3,7 @@ import urllib.request
 import urllib.error
 from decimal import Decimal
 
-from shared.pricing_math import bond_pv, fx_forward
+from shared.pricing_math import black_scholes_price, bond_pv, fx_forward, rate_at
 from shared.logging_config import get_logger
 from app.config import SNAPSHOT_URL, SERVICE_NAME
 
@@ -27,6 +27,20 @@ def current_price(snapshot: dict, symbol: str, terms: dict) -> Decimal | None:
         if not curve:
             return None
         return Decimal(str(bond_pv(terms, curve)))
+
+    if asset_class == "EUROPEAN_OPTION":
+        spot = (snapshot.get("spots") or {}).get(terms["underlying_symbol"])
+        curve = (snapshot.get("curves") or {}).get(terms.get("curve", "USD_GOV"))
+        if not spot or spot.get("implied_vol") is None or not curve:
+            return None
+        underlying = spot.get("mid") or spot.get("last") or spot.get("spot")
+        if underlying is None:
+            return None
+        T = terms["maturity_years"]
+        r = rate_at(curve["tenors"], curve["rates"], T)
+        premium = black_scholes_price(float(underlying), terms["strike"], r,
+                                      float(spot["implied_vol"]), T, terms["option_type"])
+        return Decimal(str(round(premium, 4)))
 
     spot = (snapshot.get("spots") or {}).get(symbol)
     if not spot:

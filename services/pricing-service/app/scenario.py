@@ -2,13 +2,27 @@ from decimal import Decimal
 
 from app import cache
 from app.schemas import ScenarioRequest
-from shared.pricing_math import bond_pv, fx_forward
+from shared.pricing_math import black_scholes_price, bond_pv, fx_forward, rate_at
 
 
 def _shocked_bond_pv(meta: dict, curve: dict, shock_bps: float) -> float:
     bump = shock_bps / 10000.0
     bumped = {"tenors": curve["tenors"], "rates": [r + bump for r in curve["rates"]]}
     return bond_pv(meta, bumped)
+
+
+def _option_premium(meta: dict, spot_shock: float = 0.0) -> float | None:
+    spot = cache.get_spot(meta.get("underlying_symbol"))
+    curve = cache.get_curve(meta.get("curve", "USD_GOV"))
+    if not spot or spot.get("implied_vol") is None or not curve:
+        return None
+    underlying = spot.get("mid") or spot.get("last") or spot.get("spot")
+    if underlying is None:
+        return None
+    T = float(meta["maturity_years"])
+    r = rate_at(curve["tenors"], curve["rates"], T)
+    return black_scholes_price(float(underlying) * (1 + spot_shock), float(meta["strike"]),
+                               r, float(spot["implied_vol"]), T, meta["option_type"])
 
 
 def _base_price_from_cache(inst) -> Decimal | None:
@@ -35,6 +49,10 @@ def _base_price_from_cache(inst) -> Decimal | None:
             return None
         return Decimal(str(bond_pv(inst.meta, curve)))
 
+    if inst.asset_class == "EUROPEAN_OPTION":
+        premium = _option_premium(inst.meta)
+        return Decimal(str(round(premium, 4))) if premium is not None else None
+
     return None
 
 
@@ -54,6 +72,13 @@ def _shocked_price(inst, base_price: Decimal, shock: float) -> Decimal | None:
             return None
         rate_impact = Decimal(str(_shocked_bond_pv(inst.meta, curve, shock))) - Decimal(str(bond_pv(inst.meta, curve)))
         return base_price + rate_impact
+
+    if inst.asset_class == "EUROPEAN_OPTION":
+        base = _option_premium(inst.meta)
+        shocked = _option_premium(inst.meta, spot_shock=shock)
+        if base is None or shocked is None:
+            return None
+        return base_price + Decimal(str(round(shocked - base, 4)))
 
     return None
 

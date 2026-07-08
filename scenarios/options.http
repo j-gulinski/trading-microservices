@@ -1,0 +1,72 @@
+###############################################################################
+# Scenario: European options (Black-Scholes off ACME spot + implied_vol + USD_GOV)
+# Open an ATM call (BUY) and an ATM put (SELL), watch the premium tick on the
+# valuation stream, shock the underlying, then close the call.
+# Sanity anchors at seed data (S=100, K=100, r~3%, vol~20%, T=0.5):
+#   call premium ~ 6.4, put premium ~ 4.9
+###############################################################################
+
+@marketData = http://localhost:8001
+@books      = http://localhost:8004
+@actions    = http://localhost:8008
+@pricing    = http://localhost:8002
+
+### Book for options (expected_asset_class must match the trade)
+# @name bookOpt
+POST {{books}}/books
+Content-Type: application/json
+
+{ "name": "EUROPEAN_OPTION_{{$timestamp}}", "expected_asset_class": "EUROPEAN_OPTION" }
+
+###
+@optBook = {{bookOpt.response.body.$.book_id}}
+
+### Live market: option trade_price should be today's premium, not the spot
+# @name snap
+GET {{marketData}}/snapshot
+
+### CALL - BUY 1000 (premium ~6.4 -> trade_price is indicative; pricing marks to model)
+# @name openCall
+POST {{actions}}/trade-actions
+Content-Type: application/json
+
+{ "action_type": "OPEN_TRADE", "client_request_id": "opt-call-{{$timestamp}}", "book_id": "{{optBook}}", "asset_class": "EUROPEAN_OPTION", "symbol": "ACME_CALL_100", "side": "BUY", "quantity": 1000, "trade_price": 6.4 }
+###
+@callId = {{openCall.response.body.$.trade_id}}
+
+### PUT - SELL 1000 (short premium: gains when the put cheapens)
+# @name openPut
+POST {{actions}}/trade-actions
+Content-Type: application/json
+
+{ "action_type": "OPEN_TRADE", "client_request_id": "opt-put-{{$timestamp}}", "book_id": "{{optBook}}", "asset_class": "EUROPEAN_OPTION", "symbol": "ACME_PUT_100", "side": "SELL", "quantity": 1000, "trade_price": 4.9 }
+###
+@putId = {{openPut.response.body.$.trade_id}}
+
+### Wait ~3s, then: premium = fair_value / quantity; PnL = (premium - trade_price) x qty
+GET {{pricing}}/valuations/{{callId}}
+
+###
+GET {{pricing}}/valuations/{{putId}}
+
+### Scenario: underlying +5% -> call premium jumps more than 5x delta-linear? No --
+### full BS repricing; long call scenario_pnl > 0
+POST {{pricing}}/scenario
+Content-Type: application/json
+
+{ "shock": 0.05, "position": { "side": "BUY", "quantity": 1000, "trade_price": 6.4, "instrument": { "asset_class": "EUROPEAN_OPTION", "symbol": "ACME_CALL_100", "meta": { "underlying_symbol": "ACME", "option_type": "CALL", "strike": 100.0, "maturity_years": 0.5, "curve": "USD_GOV" } } } }
+
+### Scenario: underlying -5% -> short put loses (put premium rises)
+POST {{pricing}}/scenario
+Content-Type: application/json
+
+{ "shock": -0.05, "position": { "side": "SELL", "quantity": 1000, "trade_price": 4.9, "instrument": { "asset_class": "EUROPEAN_OPTION", "symbol": "ACME_PUT_100", "meta": { "underlying_symbol": "ACME", "option_type": "PUT", "strike": 100.0, "maturity_years": 0.5, "curve": "USD_GOV" } } } }
+
+### Close the call at the current premium (take it from the valuation above)
+POST {{actions}}/trade-actions
+Content-Type: application/json
+
+{ "action_type": "CLOSE_TRADE", "client_request_id": "opt-close-{{$timestamp}}", "trade_id": "{{callId}}", "close_price": 6.5, "close_reason": "MANUAL_TEST" }
+
+### Realized PnL finalized: unrealized=0, realized=(6.5-6.4)x1000=100
+GET {{pricing}}/valuations/{{callId}}

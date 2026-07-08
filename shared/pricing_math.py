@@ -1,3 +1,21 @@
+from math import erf, exp, log, sqrt
+
+
+def normal_cdf(x):
+    return 0.5 * (1.0 + erf(x / sqrt(2.0)))
+
+
+def black_scholes_price(spot, strike, rate, vol, maturity_years, option_type):
+    if maturity_years <= 0 or vol <= 0:
+        intrinsic = spot - strike * exp(-rate * max(maturity_years, 0.0))
+        return max(intrinsic, 0.0) if option_type == "CALL" else max(-intrinsic, 0.0)
+    d1 = (log(spot / strike) + (rate + vol * vol / 2.0) * maturity_years) / (vol * sqrt(maturity_years))
+    d2 = d1 - vol * sqrt(maturity_years)
+    if option_type == "PUT":
+        return strike * exp(-rate * maturity_years) * normal_cdf(-d2) - spot * normal_cdf(-d1)
+    return spot * normal_cdf(d1) - strike * exp(-rate * maturity_years) * normal_cdf(d2)
+
+
 def fx_forward(spot, domestic_rate, foreign_rate, tenor_years):
     return spot * (1 + domestic_rate * tenor_years) / (1 + foreign_rate * tenor_years)
 
