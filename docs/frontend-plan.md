@@ -700,7 +700,47 @@ the realized number. It now falls back to the trade's latest valuation.
   (decision log → process flows → files for review at the end), and the two dangling
   "implementation artifact" references were removed.
 
-### Phase 7a — real-data seam review (before the end-of-project features)
+### Phase 7a — real-data seam review ✅ (decisions recorded)
+
+- **Outcome:** five seams decided — instrument identity, curve semantics, benchmark ownership, the
+  market-data boundary, and the strategy shape. No code, as planned.
+- **Full detail:** `docs/phase-7a-notes.md`.
+
+**Decisions E1–E5 build on**
+
+- **`trades.instrument_id` becomes the identity; `trades.symbol` becomes the market key.** Both
+  columns already exist (`instrument_id` is currently set to `symbol` and otherwise unused). An
+  option is `instrument_id = ACME_C_105_2027-01`, `symbol = ACME` — so `cache.trades_for_symbol`
+  revalues it on the underlying's tick with **no change to pricing's dispatch**. Instrument
+  parameters stay in `trades.metadata`, which already captures the terms as struck.
+- **The curve is a ZERO curve with annual compounding, and tenors must be strictly ascending.**
+  `bond_pv` discounts each cashflow at `rate_at(t)`, which is only correct for zeros, yet
+  `curve_type` says `YIELD`. E3 changes it to `ZERO`. IRS forwards must be derived under the same
+  compounding. Real par-yield sources bootstrap **in the adapter**, behind the market-data boundary.
+- **Pricing owns the alpha/beta window; it is in-memory, rebuilt on startup, not a table.** Both
+  inputs (`valuations`, `market_data_spot_prices`) are already persisted. The three named edge cases
+  return `null`, never a number: gaps → fixed-grid sampling with **pairwise deletion**, too-few
+  observations → `null`, zero benchmark variance → `null`. E4 sanity vector: beta of the benchmark
+  against itself ≈ 1.
+- **The snapshot + named-SSE contract is the right seam and holds for a real producer.** Three
+  leaks to fix: `source` is hardcoded `"SIMULATED"`; staleness thresholds are tuned to the
+  simulator's metronome and must become **per-asset-class** before a real feed lands; `event_id` is
+  documented as publisher-assigned sequencing, not a market fact.
+- **A strategy is an intent producer, not a service.** `source` becomes the producer identity
+  (`Text`, so no migration), `client_request_id` generalizes to `<producer>-<action>-<uuid>`, and
+  the producer host subscribes to `/stream` instead of polling `/snapshot` per intent. **Concrete
+  bug this creates:** `domain/generator.js` `isGeneratedIntent()` classifies on the `gen-` prefix
+  and would label strategy intents as MANUAL — it must classify on `source`, which needs the wider
+  audit payload E5 already requires.
+
+**Live defect surfaced by the review — assigned to E1, not fixed here.**
+`SYMBOL_BY_CLASS = {terms["asset_class"]: symbol for …}` is keyed on a non-unique field, so with two
+BOND instruments the last wins: **`GOVT_2Y` is unreachable and has never been traded** (confirmed —
+293 generated trades, five symbols, zero `GOVT_2Y`). `book_client.ensure_books()` has the same
+shape, so since 6b-1 a user-created second book of an existing class can silently capture the
+generator.
+
+#### Original plan (as approved)
 
 - **Goal:** make the boundary decisions the end-of-project features will sit on, with the
   homework-5 real-data lens (Yahoo Finance / OpenFin, signal strategies). Output is **recorded
