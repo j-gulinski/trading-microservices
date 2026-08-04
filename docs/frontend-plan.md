@@ -555,7 +555,46 @@ exists. `EST. NOTIONAL` is labelled `QTY × LAST PRICE` and ignores contract mul
   the honest unavailable state; `npm run lint/build/deadcode` clean (`positionsOf` and
   `apiPut`/`apiDelete` come off the accepted-knip-flags list here).
 
-### Phase 6b-2 — Book lifecycle: delete guard, reassignment, per-book Flatten
+### Phase 6b-2 — Book lifecycle: delete guard, reassignment, per-book Flatten ✅ (built and verified)
+
+- **Outcome:** `Flatten` and `Delete` from the mockup are real and safe. books-service refuses to
+  deactivate a book with open positions (asking the blotter over HTTP, and refusing when it cannot
+  ask); `REASSIGN_TRADES` joins the trade-action queue; close-all gained a `book_id` filter.
+- **Full detail:** `docs/phase-6b2-notes.md`.
+
+**Contracts and rules later phases inherit**
+
+- **The guard is on ACTIVE trades, not any trade.** `DELETE /books/{id}` is a soft delete, and
+  closed trades stay attributed to the book they happened in — so "any trade" would make every book
+  that ever traded permanently undeletable. Deleting means *stops accepting trades, leaves the
+  roster*, never *never existed*.
+- **Guard the state transition, not the route.** `PUT /books/{id}` also accepts `is_active`, so the
+  same guard fronts both endpoints. A rule attached to one URL is bypassable by the next one.
+- **Cross-service reads fail closed.** books-service reaches the blotter through `blotter_client.py`
+  (the 6a trade-generation precedent, not a new pattern) rather than querying `trades` directly, and
+  a destructive operation that cannot verify its precondition is **refused with 503** — distinct
+  from the `409` that means the precondition genuinely failed.
+- **The blotter re-indexes on disagreement.** Its ACTIVE-trade cache is keyed by `book_id` and was
+  never updated after load, so a reassignment would have been invisible until restart. It now
+  corrects itself when a streamed valuation's `book_id` disagrees with the cached one — pricing
+  re-reads its active set every 2 s, so the truth is already on the wire. `IndexedStore.update_field`
+  does the remove-mutate-add atomically; doing it from the caller corrupts the index.
+- **`202 accepted` cannot be chained.** Trade-action enqueues; the effect lands later. The move →
+  delete flow reports the acknowledgement and lets the 5 s roster poll reconcile, rather than
+  auto-continuing into the guard it would race.
+- **`ApiError` carries the response body.** Status codes stay diagnostic and the copy stays ours,
+  but a server-supplied *reason* (the open-trade count on a 409) is not a status code.
+- **A new trade mutation must be added to the Trade Actions feed list.** `FEED_EVENT_TYPES` is an
+  explicit allow-list; a mutation missing from it is invisible on the screen whose job is showing
+  every mutation.
+
+**Two fixes beyond the approved scope, both caused by this phase:** the blotter re-index above, and
+`realized_pnl_by_book` skipping trades closed without a `close_price` — which made a flattened
+book's PnL vanish from the card (unrealized → 0, realized stays 0) even though pricing had written
+the realized number. It now falls back to the trade's latest valuation.
+
+#### Original plan (as approved)
+
 - **Goal:** make destructive book operations safe — the heaviest backend feature since Phase 3,
   which is why it has its own gate.
 - **From review (2026-08-03):** deleting or closing a book that still has trades must be refused

@@ -67,7 +67,15 @@ function PositionList({ positions }) {
   )
 }
 
-export default function BookCard({ book, expanded, positions, onToggleExpand, onEdit }) {
+export default function BookCard({
+  book,
+  expanded,
+  positions,
+  onToggleExpand,
+  onEdit,
+  onFlatten,
+  onDelete,
+}) {
   return (
     <article className={`book-tile${expanded ? ' book-tile--expanded' : ''}`}>
       <header className="book-tile__head">
@@ -96,9 +104,26 @@ export default function BookCard({ book, expanded, positions, onToggleExpand, on
           {formatNumber(book.activeTrades)} open · {formatNumber(book.closedTrades)} closed{' '}
           {expanded ? '↑' : '→'}
         </button>
-        <button type="button" className="book-tile__edit" onClick={onEdit}>
-          Edit
-        </button>
+        <div className="book-tile__actions">
+          <button type="button" className="book-tile__action" onClick={onEdit}>
+            Edit
+          </button>
+          <button
+            type="button"
+            className="book-tile__action"
+            disabled={book.activeTrades === 0}
+            onClick={onFlatten}
+          >
+            Flatten
+          </button>
+          <button
+            type="button"
+            className="book-tile__action book-tile__action--danger"
+            onClick={onDelete}
+          >
+            Delete
+          </button>
+        </div>
       </footer>
 
       {expanded && (

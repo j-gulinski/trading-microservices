@@ -57,6 +57,23 @@ export function buildOpenTradeIntent({
   }
 }
 
+export function buildReassignIntent(sourceBookId, targetBookId) {
+  return {
+    action_type: 'REASSIGN_TRADES',
+    book_id: sourceBookId,
+    target_book_id: targetBookId,
+    client_request_id: `manual-move-${crypto.randomUUID()}`,
+  }
+}
+
+export function buildFlattenIntent(bookId) {
+  return {
+    book_id: bookId,
+    close_reason: 'BOOK_FLATTEN',
+    client_request_id: `manual-flatten-${crypto.randomUUID()}`,
+  }
+}
+
 export function buildCloseTradeIntent(tradeId, closePrice) {
   return {
     action_type: 'CLOSE_TRADE',

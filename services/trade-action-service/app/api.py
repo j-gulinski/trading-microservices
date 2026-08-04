@@ -49,7 +49,12 @@ def trade_action_close_all():
     intent = dict(request.json or {})
     intent["action_type"] = "CLOSE_ALL"
     action_queue.enqueue(intent)
-    return _json({"status": "accepted", "action_type": "CLOSE_ALL"}, 202)
+    return _json({
+        "status": "accepted",
+        "action_type": "CLOSE_ALL",
+        "book_id": intent.get("book_id"),
+        "client_request_id": intent.get("client_request_id"),
+    }, 202)
 
 
 @app.route("/queue/status")

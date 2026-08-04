@@ -72,18 +72,37 @@ def closed_trade_counts_by_book() -> dict[str, int]:
         return {str(book_id): count for book_id, count in rows}
 
 
+def _marked_realized_by_trade(session, trade_ids) -> dict:
+    if not trade_ids:
+        return {}
+    rows = (
+        session.query(Valuation.trade_id, Valuation.realized_pnl)
+        .filter(Valuation.trade_id.in_(trade_ids))
+        .distinct(Valuation.trade_id)
+        .order_by(Valuation.trade_id, Valuation.valuation_time.desc())
+        .all()
+    )
+    return {trade_id: realized for trade_id, realized in rows}
+
+
 def realized_pnl_by_book() -> dict[str, object]:
     totals: dict[str, object] = {}
     with session_scope() as session:
         rows = session.query(Trade).filter(Trade.status == "CLOSED").all()
+        marked = _marked_realized_by_trade(
+            session, [t.trade_id for t in rows if t.close_price is None]
+        )
         for t in rows:
             if t.close_price is None:
-                continue
-            multiplier = int((t.trade_metadata or {}).get("multiplier", 1))
-            if t.side == "SELL":
-                realized = (t.trade_price - t.close_price) * t.quantity * multiplier
+                realized = marked.get(t.trade_id)
+                if realized is None:
+                    continue
             else:
-                realized = (t.close_price - t.trade_price) * t.quantity * multiplier
+                multiplier = int((t.trade_metadata or {}).get("multiplier", 1))
+                if t.side == "SELL":
+                    realized = (t.trade_price - t.close_price) * t.quantity * multiplier
+                else:
+                    realized = (t.close_price - t.trade_price) * t.quantity * multiplier
             book_id = str(t.book_id)
             totals[book_id] = (totals.get(book_id) or Decimal("0")) + realized
     return totals

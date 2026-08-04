@@ -148,7 +148,12 @@
     outline-offset: 1px;
   }
 }
-.book-tile__edit {
+.book-tile__actions {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+}
+.book-tile__action {
   min-height: 28px;
   padding: 0 var(--sp-3);
   border: 1px solid var(--border);
@@ -160,13 +165,26 @@
   font-weight: 600;
   cursor: pointer;
 
-  &:hover {
+  &:hover:not(:disabled) {
     border-color: var(--border-strong);
     color: var(--text-primary);
   }
   &:focus-visible {
     outline: 2px solid var(--accent);
     outline-offset: 1px;
+  }
+  &:disabled {
+    opacity: 0.4;
+    cursor: default;
+  }
+}
+.book-tile__action--danger {
+  border-color: rgba(248, 113, 113, 0.32);
+  color: var(--neg);
+
+  &:hover:not(:disabled) {
+    border-color: rgba(248, 113, 113, 0.6);
+    color: var(--neg);
   }
 }
 

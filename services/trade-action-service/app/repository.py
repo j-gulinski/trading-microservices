@@ -6,6 +6,10 @@ from shared.models import Trade, Book
 from shared.functions import utcnow
 
 
+def get_book(session, book_id):
+    return session.get(Book, book_id)
+
+
 def get_active_book(session, book_id):
     book = session.get(Book, book_id)
     if book is None or not book.is_active:
@@ -56,11 +60,25 @@ def close_trade(session, trade_id, close_price, close_reason) -> int:
     return result.rowcount
 
 
-def close_all_trades(session, close_reason) -> list:
+def reassign_active_trades(session, source_book_id, target_book_id) -> list:
     now = utcnow()
     result = session.execute(
         update(Trade)
-        .where(Trade.status == "ACTIVE")
+        .where(Trade.book_id == source_book_id, Trade.status == "ACTIVE")
+        .values(book_id=target_book_id, updated_at=now)
+        .returning(Trade.trade_id)
+    )
+    return [row[0] for row in result]
+
+
+def close_all_trades(session, close_reason, book_id=None) -> list:
+    now = utcnow()
+    filters = [Trade.status == "ACTIVE"]
+    if book_id is not None:
+        filters.append(Trade.book_id == book_id)
+    result = session.execute(
+        update(Trade)
+        .where(*filters)
         .values(
             status="CLOSED",
             close_reason=close_reason,

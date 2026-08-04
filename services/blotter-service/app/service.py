@@ -27,6 +27,10 @@ def handle_valuation(valuation: dict) -> None:
         if loaded is None or loaded.status != "ACTIVE":
             return
         cache.trades.add(loaded)
+    else:
+        book_id = valuation.get("book_id")
+        if book_id and cache.trades.update_field(trade_id, "book_id", str(book_id)):
+            log.info("trade_reindexed", trade_id=trade_id, book_id=str(book_id))
 
     cache.record_valuation(valuation)
 
@@ -135,6 +139,7 @@ def books_summary() -> list[dict]:
             "book_id": book_id,
             "name": book["name"],
             "expected_asset_class": book["expected_asset_class"],
+            "is_active": book["is_active"],
             "active_trades": len(active),
             "closed_trades": closed_by_book.get(book_id, 0),
             "realized_pnl": realized,

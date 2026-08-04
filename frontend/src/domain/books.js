@@ -22,7 +22,15 @@ export function bookSummariesOf(raw) {
       realizedPnl: toNum(book.realized_pnl),
       unrealizedPnl: toNum(book.unrealized_pnl),
       currency: book.currency ?? null,
+      isActive: book.is_active !== false,
     }))
+}
+
+export function moveTargetsOf(books, book) {
+  if (book == null) return []
+  return books.filter(
+    (other) => other.isActive && other.id !== book.id && other.assetClass === book.assetClass,
+  )
 }
 
 export function summarizeBooks(books) {
