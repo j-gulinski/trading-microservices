@@ -5,8 +5,7 @@ from decimal import Decimal
 
 from app import persistence
 from app.config import TICK_INTERVAL_MS, SERVICE_NAME
-from app.publisher import publish_tick
-from shared.functions import get_iso_timestamp
+from app.market_events import publish_market_event
 from shared.logging_config import get_logger
 
 log = get_logger(SERVICE_NAME)
@@ -20,7 +19,7 @@ PRICE_MODEL = {
 }
 PRICE_MEAN_REVERSION = 0.02
 
-CURVE_VOLATILITY = 0.000025
+CURVE_VOLATILITY = 0.00004
 CURVE_MEAN_REVERSION = 0.08
 
 INDEX_BASKET = {"ACME": "mid", "XAUUSD": "spot", "ES_FUT": "last"}
@@ -152,39 +151,32 @@ def generate_curve_tick():
     }
 
 GENERATORS = [
-    ("market_tick", "spot",  "ACME",    generate_equity_tick),
-    ("market_tick", "spot",  "XAUUSD",  generate_commodity_tick),
-    ("market_tick", "spot",  "ES_FUT",  generate_futures_tick),
-    ("market_tick", "spot",  "EURUSD",  generate_fx_tick),
-    ("market_tick", "spot",  "MARKET_INDEX", generate_index_tick),
-    ("curve_tick",  "curve", "USD_GOV", generate_curve_tick),
+    ("market_tick", generate_equity_tick),
+    ("market_tick", generate_commodity_tick),
+    ("market_tick", generate_futures_tick),
+    ("market_tick", generate_fx_tick),
+    ("market_tick", generate_index_tick),
+    ("curve_tick", generate_curve_tick),
 ]
 
 
-def _run_generator(event_type, kind, key, build):
+def _run_generator(event_type, build):
     while True:
         with persistence.data_lock:
             tick = build()
-            tick["stream_id"] = persistence.stream_id
-            tick["event_id"] = persistence.ticks_generated
-            tick["event_time"] = get_iso_timestamp()
-            persistence.ticks_generated += 1
-            persistence.last_event_timestamp = tick["event_time"]
-            persistence.update_state(kind, key, tick)
 
-        persistence.persist(kind, tick)
-        publish_tick(event_type, tick)
+        publish_market_event(event_type, tick)
 
         time.sleep(TICK_INTERVAL_MS / 1000.0 * random.uniform(0.8, 1.2))
 
 
 def start_generators():
     threads = []
-    for event_type, kind, key, build in GENERATORS:
+    for event_type, build in GENERATORS:
         thread = threading.Thread(
             target=_run_generator,
-            args=(event_type, kind, key, build),
-            name=f"gen-{key}",
+            args=(event_type, build),
+            name=f"gen-{build.__name__.removeprefix('generate_').removesuffix('_tick')}",
             daemon=True,
         )
         thread.start()

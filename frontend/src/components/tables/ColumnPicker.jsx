@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import Icon from '../Icon.jsx'
 
 export default function ColumnPicker({
   ariaLabel = 'Table columns',
@@ -175,7 +176,7 @@ export default function ColumnPicker({
                     )
                   }}
                 >
-                  <span aria-hidden="true">⠿</span>
+                  <Icon name="grip" className="table-columns__drag-icon" />
                 </button>
               </div>
             )

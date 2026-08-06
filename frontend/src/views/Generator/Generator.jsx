@@ -166,6 +166,7 @@ export default function Generator() {
   const intervalValue = draft.interval_ms ?? generator.intervalMs
   const targetValue = draft.target_open_trades ?? generator.targetOpenTrades
   const unreachable = status.error != null
+  const statusUnknown = status.loading || unreachable
   const capacityPercent = Number.isFinite(generator.openTrades)
     && Number.isFinite(generator.targetOpenTrades)
     && generator.targetOpenTrades > 0
@@ -177,9 +178,11 @@ export default function Generator() {
       <div className="generator">
         <div className="generator__controls">
           <Panel
-            title="GENERATOR"
+            title="Generator controls"
             meta={
-              unreachable
+              status.loading
+                ? <StatusPill level="unknown" label="LOADING" />
+                : unreachable
                 ? <StatusPill level="down" label="UNAVAILABLE" />
                 : (
                   <StatusPill
@@ -224,7 +227,7 @@ export default function Generator() {
 
                 <label className="generator__field" htmlFor="generator-interval">
                   <span className="generator__label">
-                    INTERVAL · {intervalValue != null ? `${formatNumber(intervalValue)} ms` : '—'}
+                    Interval · {intervalValue != null ? `${formatNumber(intervalValue)} ms` : '—'}
                   </span>
                   <input
                     id="generator-interval"
@@ -239,7 +242,7 @@ export default function Generator() {
                 </label>
 
                 <label className="generator__field" htmlFor="generator-target">
-                  <span className="generator__label">MAX ACTIVE POSITIONS</span>
+                  <span className="generator__label">Max active positions</span>
                   <input
                     id="generator-target"
                     type="number"
@@ -261,7 +264,7 @@ export default function Generator() {
                 </label>
 
                 <div className="generator__field">
-                  <span className="generator__label">CLOSE PROBABILITY · DERIVED</span>
+                  <span className="generator__label">Close probability · derived</span>
                   <div className="generator__derived">
                     <strong>
                       {generator.closeProbability != null
@@ -273,7 +276,7 @@ export default function Generator() {
                 </div>
 
                 <div className="generator__field">
-                  <span className="generator__label">ASSET CLASSES · ONE BOOK EACH</span>
+                  <span className="generator__label">Asset classes · one book each</span>
                   <div className="generator__chips">
                     {assetClasses.length > 0
                       ? assetClasses.map((assetClass) => (
@@ -293,31 +296,31 @@ export default function Generator() {
           <div className="generator__stats">
             <StatCard
               label="OPEN TRADES"
-              value={unreachable ? '—' : formatNumber(generator.openTrades)}
+              value={statusUnknown ? '—' : formatNumber(generator.openTrades)}
               sub={generator.targetOpenTrades != null
                 ? `target ${formatNumber(generator.targetOpenTrades)}`
                 : 'target unknown'}
             />
             <StatCard
               label="CAPACITY"
-              value={unreachable || capacityPercent == null
+              value={statusUnknown || capacityPercent == null
                 ? '—'
                 : percentLabel(capacityPercent, 2)}
               sub="open / target"
             />
             <StatCard
               label="OPENED"
-              value={unreachable ? '—' : formatNumber(generator.opened)}
+              value={statusUnknown ? '—' : formatNumber(generator.opened)}
               sub="this process"
             />
             <StatCard
               label="CLOSED"
-              value={unreachable ? '—' : formatNumber(generator.closed)}
+              value={statusUnknown ? '—' : formatNumber(generator.closed)}
               sub="this process"
             />
             <StatCard
               label="FAILED"
-              value={unreachable ? '—' : formatNumber(generator.failed)}
+              value={statusUnknown ? '—' : formatNumber(generator.failed)}
               sub="submission errors"
               tone={generator.failed > 0 ? 'warn' : 'default'}
             />
@@ -325,17 +328,21 @@ export default function Generator() {
         </div>
 
         <Panel
-          title="LIVE INTENT FEED"
+          title="Live intent feed"
           meta={
             <>
-              {feed.error
+              {feed.loading
+                ? <StatusPill level="unknown" label="LOADING" />
+                : feed.error
                 ? <StatusPill level="down" label="UNAVAILABLE" />
                 : <StatusPill level="healthy" label="LIVE" />}
-              <span>
-                {intents.opened} in · {intents.closed} out
-                {intents.rejected > 0 && ` · ${intents.rejected} rejected`}
-                {pollAgeMs != null && ` · ${formatElapsedTime(pollAgeMs)}`}
-              </span>
+              {!feed.loading && (
+                <span>
+                  {intents.opened} in · {intents.closed} out
+                  {intents.rejected > 0 && ` · ${intents.rejected} rejected`}
+                  {pollAgeMs != null && ` · ${formatElapsedTime(pollAgeMs)}`}
+                </span>
+              )}
             </>
           }
         >

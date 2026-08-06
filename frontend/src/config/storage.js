@@ -3,7 +3,7 @@ export const STORAGE_KEYS = {
   tradeColumns: 'trades.visible-columns',
   valuationColumns: 'valuations.visible-columns',
   marketColumns: 'market-data.visible-columns',
-  curveColumns: 'market-data.curve-visible-columns',
+  curveColumns: 'market-data.curve-columns-v2',
   marketTickCount: 'market-data.tick-count',
   marketFeedState: 'market-data.feed-state',
 }

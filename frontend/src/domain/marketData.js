@@ -2,7 +2,6 @@
 import {
   HISTORY_LENGTH,
   MARKET_STALE_AFTER_MS,
-  BOND_CURVE_TENORS,
 } from '../config/marketData.js'
 import { formatTenor } from './marketFormat.js'
 import { directionOf } from './formatting.js'
@@ -57,26 +56,27 @@ function curveInstruments(curve, snapshotStreamId = null) {
   const tenors = curve.tenors ?? []
   const rates = curve.rates ?? []
   const eventTimeMs = eventTimeOf(curve)
-  return tenors.flatMap((tenor, i) =>
-    BOND_CURVE_TENORS.includes(Number(tenor))
-      ? [
-          {
-            id: `${curve.curve_name}@${tenor}`,
-            symbol: `${curve.curve_name} · ${formatTenor(tenor)}`,
-            assetClass: 'RATE',
-            currency: curve.currency ?? null,
-            value: toNum(rates[i]),
-            bid: null,
-            ask: null,
-            unit: 'rate',
-            tenor,
-            sourceStreamId: curve.stream_id ?? snapshotStreamId,
-            sourceEventId: eventIdOf(curve),
-            eventTimeMs,
-          },
-        ]
-      : [],
-  )
+  if (!Array.isArray(tenors) || !Array.isArray(rates) || tenors.length !== rates.length) {
+    return []
+  }
+  return tenors.flatMap((tenor, i) => {
+    const tenorYears = Number(tenor)
+    if (!Number.isFinite(tenorYears) || tenorYears <= 0) return []
+    return [{
+      id: `${curve.curve_name}@${tenorYears}`,
+      symbol: `${curve.curve_name} · ${formatTenor(tenorYears)}`,
+      assetClass: 'RATE',
+      currency: curve.currency ?? null,
+      value: toNum(rates[i]),
+      bid: null,
+      ask: null,
+      unit: 'rate',
+      tenor: tenorYears,
+      sourceStreamId: curve.stream_id ?? snapshotStreamId,
+      sourceEventId: eventIdOf(curve),
+      eventTimeMs,
+    }]
+  })
 }
 
 export function instrumentsFromEvent(name, data) {
@@ -192,7 +192,7 @@ function restoreInstrument(candidate) {
   }
 
   const tenor = Number(candidate.tenor)
-  if (candidate.assetClass === 'RATE' && !BOND_CURVE_TENORS.includes(tenor)) {
+  if (candidate.assetClass === 'RATE' && (!Number.isFinite(tenor) || tenor <= 0)) {
     return null
   }
 

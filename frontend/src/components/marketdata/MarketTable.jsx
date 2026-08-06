@@ -33,7 +33,7 @@ function cellTitle(column, row) {
   return undefined
 }
 
-export default function MarketTable({ table, rows, caption, sortDisabledReason }) {
+export default function MarketTable({ table, rows, caption, sortDisabledReason, minWidth }) {
   return (
     <DataTable
       columns={table.columns}
@@ -47,6 +47,7 @@ export default function MarketTable({ table, rows, caption, sortDisabledReason }
       cellClassName={cellClassName}
       cellTitle={cellTitle}
       caption={caption}
+      minWidth={minWidth}
     />
   )
 }

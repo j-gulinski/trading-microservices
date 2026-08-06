@@ -20,23 +20,28 @@ spots = {
     "ACME": {
         "symbol": "ACME", "asset_class": "EQUITY", "currency": "USD",
         "bid": 100.94, "ask": 100.96, "mid": 100.95, "last": 100.95, "spot": None,
+        "source": "SIMULATED",
     },
     "XAUUSD": {
         "symbol": "XAUUSD", "asset_class": "COMMODITY", "currency": "USD",
         "bid": 2453.50, "ask": 2453.70, "mid": 2453.60, "last": 2453.60, "spot": 2453.60,
+        "source": "SIMULATED",
     },
     "ES_FUT": {
         "symbol": "ES_FUT", "asset_class": "FUTURES", "currency": "USD",
         "bid": 5250.25, "ask": 5250.50, "mid": None, "last": 5250.25, "spot": 5250.25,
+        "source": "SIMULATED",
     },
     "EURUSD": {
         "symbol": "EURUSD", "asset_class": "FX", "currency": "USD",
         "bid": 1.09196, "ask": 1.09204, "mid": 1.09200, "last": None, "spot": 1.09200,
         "domestic_rate": 0.0430, "foreign_rate": 0.0275,
+        "source": "SIMULATED",
     },
     "MARKET_INDEX": {
         "symbol": "MARKET_INDEX", "asset_class": "INDEX", "currency": "USD",
         "bid": None, "ask": None, "mid": None, "last": 4883.11, "spot": 4883.11,
+        "source": "SIMULATED",
     },
 }
 
@@ -45,7 +50,7 @@ CURVE_ANCHOR = [0.0450, 0.0443, 0.0431, 0.0422, 0.0412, 0.0410, 0.0415]
 
 curves = {
     "USD_GOV": {"curve_name": "USD_GOV", "curve_type": "YIELD", "currency": "USD",
-                "tenors": list(CURVE_TENORS), "rates": list(CURVE_ANCHOR)},
+                "tenors": list(CURVE_TENORS), "rates": list(CURVE_ANCHOR), "source": "SIMULATED"},
 }
 
 def update_state(kind: str, key: str, tick: dict) -> None:
@@ -98,7 +103,7 @@ def _save_spot(tick: dict) -> None:
             last=tick.get("last"),
             spot=tick.get("spot"),
             currency=tick.get("currency"),
-            source="SIMULATED",
+            source=tick.get("source") or "SIMULATED",
             event_time=_event_time(tick),
             created_at=created_at,
             raw_payload=tick,

@@ -45,9 +45,13 @@
   &::placeholder {
     color: var(--text-muted);
   }
-  &:focus {
-    outline: none;
+  &:hover {
     border-color: var(--border-strong);
+  }
+  &:focus-visible {
+    border-color: var(--accent);
+    outline: 2px solid var(--accent);
+    outline-offset: 1px;
   }
 }
 .filter-bar__check {
@@ -78,9 +82,13 @@
   font-size: 13px;
   font-family: var(--font-sans);
 
-  &:focus {
-    outline: none;
+  &:hover {
     border-color: var(--border-strong);
+  }
+  &:focus-visible {
+    border-color: var(--accent);
+    outline: 2px solid var(--accent);
+    outline-offset: 1px;
   }
 }
 @container page (max-width: 960px) {

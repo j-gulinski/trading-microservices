@@ -21,6 +21,7 @@ import { countOptions } from '../../domain/filters.js'
 import { formatClockTime, formatNumber } from '../../domain/formatting.js'
 import StatCard from '../../components/cards/StatCard.jsx'
 import StreamHeader from '../../components/status/StreamHeader.jsx'
+import StatusPill from '../../components/status/StatusPill.jsx'
 import FilterBar from '../../components/filters/FilterBar.jsx'
 import { STORAGE_KEYS } from '../../config/storage.js'
 import EmptyState from '../../components/EmptyState.jsx'
@@ -28,6 +29,7 @@ import ColumnPicker from '../../components/tables/ColumnPicker.jsx'
 import SortCaptureStatus from '../../components/tables/SortCaptureStatus.jsx'
 import MarketTable from '../../components/marketdata/MarketTable.jsx'
 import MarketIndexCard from '../../components/marketdata/MarketIndexCard.jsx'
+import YieldCurveChart from '../../components/marketdata/YieldCurveChart.jsx'
 
 const BENCHMARK_ID = 'MARKET_INDEX'
 
@@ -75,6 +77,7 @@ export default function MarketData() {
     captureSnapshot: (column, capturedAt) =>
       captureMarketSnapshot(curveRows, column, capturedAt),
   })
+  const curveTableView = { ...curveTable, columns: CURVE_COLUMNS }
 
   function handleClassChange(nextClass) {
     setActiveClass(nextClass)
@@ -102,6 +105,11 @@ export default function MarketData() {
 
   const summary = summarizeFeed(Object.values(instruments), now)
   const benchmark = instruments[BENCHMARK_ID]
+  const curveIsLive = curveRows.length > 0 && curveRows.every((row) => row.live)
+  const curveUpdatedAt = curveRows.reduce(
+    (latest, row) => Math.max(latest, row.instrument.eventTimeMs ?? 0),
+    0,
+  )
 
   let content
   if (rows.length === 0) {
@@ -146,32 +154,40 @@ export default function MarketData() {
             </div>
             <div className="market-section__actions">
               <span>{visibleCurveRows.length} tenors</span>
-              <ColumnPicker
-                ariaLabel="Yield curve columns"
-                columns={CURVE_COLUMNS}
-                visibleColumns={curveTable.visibleColumns}
-                onToggle={curveTable.toggleColumn}
-                onReorder={curveTable.reorderColumn}
-                onReset={curveTable.resetColumns}
-              />
+              {curveRows.length > 0 && (
+                <>
+                  <StatusPill
+                    level={curveIsLive ? 'info' : 'stale'}
+                    label={curveIsLive ? 'LIVE' : 'STALE'}
+                    compact
+                  />
+                  <span>Updated {formatClockTime(curveUpdatedAt, { millis: true })}</span>
+                </>
+              )}
             </div>
           </div>
-          <SortCaptureStatus sort={curveTable.sort} />
-          {visibleCurveRows.length > 0 ? (
-            <MarketTable
-              table={curveTable}
-              rows={visibleCurveRows}
-              caption="USD government yield-curve tenors with observed and last-tick change, trend, and feed status"
-            />
-          ) : (
-            <EmptyState
-              message={
-                curveRows.length > 0
-                  ? 'No curve tenors match this search.'
-                  : 'No curve data published yet.'
-              }
-            />
-          )}
+          <div className="market-curve-layout">
+            <div className="market-curve-layout__table">
+              <SortCaptureStatus sort={curveTable.sort} />
+              {visibleCurveRows.length > 0 ? (
+                <MarketTable
+                  table={curveTableView}
+                  rows={visibleCurveRows}
+                  caption="USD government yield-curve tenors with current yield, last-tick change, and session change"
+                  minWidth={0}
+                />
+              ) : (
+                <EmptyState
+                  message={
+                    curveRows.length > 0
+                      ? 'No curve tenors match this search.'
+                      : 'No curve data published yet.'
+                  }
+                />
+              )}
+            </div>
+            <YieldCurveChart rows={curveRows} />
+          </div>
         </section>
       </div>
     )

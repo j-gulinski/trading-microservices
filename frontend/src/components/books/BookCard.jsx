@@ -1,4 +1,5 @@
 import StatusPill from '../status/StatusPill.jsx'
+import Icon from '../Icon.jsx'
 import {
   directionOf,
   formatNumber,
@@ -87,15 +88,15 @@ export default function BookCard({
           <h3 className="book-tile__name">{book.name}</h3>
           <span className="book-tile__code">{formatShortId(book.id)}</span>
         </div>
-        <span className="book-tile__badge">
+        <span className="book-tile__class">
           <span className="book-tile__badge-dot" />
           {book.assetClass}
         </span>
       </header>
 
       <div className="book-tile__pnl">
-        <PnlMetric label={`UNREALIZED · ${book.currency ?? 'USD'}`} value={book.unrealizedPnl} />
-        <PnlMetric label="REALIZED" value={book.realizedPnl} />
+        <PnlMetric label={`Unrealized · ${book.currency ?? 'USD'}`} value={book.unrealizedPnl} />
+        <PnlMetric label="Realized" value={book.realizedPnl} />
       </div>
 
       <footer className="book-tile__foot">
@@ -106,7 +107,10 @@ export default function BookCard({
           onClick={onToggleExpand}
         >
           {formatNumber(book.activeTrades)} open · {formatNumber(book.closedTrades)} closed{' '}
-          {expanded ? '↑' : '→'}
+          <Icon
+            name={expanded ? 'chevronUp' : 'arrowRight'}
+            className="book-tile__positions-icon"
+          />
         </button>
         {book.isActive ? (
           <div className="book-tile__actions">

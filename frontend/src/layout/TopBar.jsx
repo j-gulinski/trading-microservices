@@ -1,9 +1,12 @@
 export default function TopBar({ route, onNewTrade }) {
   return (
     <header className="topbar">
-      <div>
+      <div className="topbar__heading">
         <h1 className="topbar__title">{route.label}</h1>
-        <div className="topbar__subtitle">{route.subtitle}</div>
+        <div className="topbar__context">
+          <span className="topbar__environment">SIM</span>
+          <span className="topbar__subtitle">{route.subtitle}</span>
+        </div>
       </div>
       <button
         type="button"

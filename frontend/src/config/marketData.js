@@ -4,8 +4,6 @@ export const MARKET_STALE_AFTER_MS = 5000
 
 export const HISTORY_LENGTH = 100
 
-export const BOND_CURVE_TENORS = [1, 2, 3, 5, 10]
-
 const CHANGE_COLUMNS = [
   {
     id: 'observedChange',
@@ -107,8 +105,26 @@ export const CURVE_COLUMNS = [
     defaultDirection: 'desc',
     numeric: true,
   },
-  ...CHANGE_COLUMNS,
-  ...TRAILING_COLUMNS,
+  {
+    id: 'lastTickChange',
+    label: 'Tick Δ',
+    required: true,
+    sortable: true,
+    snapshot: true,
+    defaultDirection: 'desc',
+    numeric: true,
+    headerNote: 'vs prior',
+  },
+  {
+    id: 'observedChange',
+    label: 'Session Δ',
+    required: true,
+    sortable: true,
+    snapshot: true,
+    defaultDirection: 'desc',
+    numeric: true,
+    headerNote: 'vs open',
+  },
 ]
 
 export const DEFAULT_MARKET_SORT = { column: 'assetClass', direction: 'asc' }

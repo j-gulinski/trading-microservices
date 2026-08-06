@@ -1,3 +1,5 @@
+import Icon from '../Icon.jsx'
+
 function classes(...values) {
   return values.filter(Boolean).join(' ')
 }
@@ -49,7 +51,7 @@ function SortHeader({ column, sort, onSort, disabledReason }) {
           <ColumnLabel column={column} />
         </span>
         <span className="data-table__sort-icon" aria-hidden="true">
-          {active ? (sort.direction === 'asc' ? '▲' : '▼') : '↕'}
+          <Icon name={active ? (sort.direction === 'asc' ? 'sortAsc' : 'sortDesc') : 'sort'} />
         </span>
       </button>
     </th>
@@ -69,12 +71,13 @@ export default function DataTable({
   cellTitle = () => undefined,
   onRowClick = null,
   caption,
+  minWidth,
 }) {
-  const minWidth = Math.max(520, 500 + (columns.length - 2) * 80)
+  const resolvedMinWidth = minWidth ?? Math.max(520, 500 + (columns.length - 2) * 80)
 
   return (
     <div className="data-table-wrap">
-      <table className="data-table" style={{ minWidth }}>
+      <table className="data-table" style={{ minWidth: resolvedMinWidth }}>
         <caption className="data-table__caption">{caption}</caption>
         <thead>
           <tr>

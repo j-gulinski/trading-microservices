@@ -1,6 +1,10 @@
 .env
 __pycache__/
 *.claude
+*.agents
+*.codex
+.impeccable
+
 # Logs
 logs
 *.log
@@ -25,3 +29,4 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+tmp/*
