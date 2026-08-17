@@ -1,5 +1,11 @@
 # Trading Microservices
 
+> **Archived — continued in [trading-desk](https://github.com/j-gulinski/trading-desk).**
+> This repository is the frozen synthetic demo: every price and trade is generated locally, so it
+> boots and runs with zero API keys or configuration. Development continues in
+> [trading-desk](https://github.com/j-gulinski/trading-desk), which replaces the generators with
+> real market data from six providers. The final pre-fork state is tagged `pre-fork-final`.
+
 A local trading and risk system that exercises the complete path from market movement to a
 browser-visible PnL change. Market Data publishes prices and curves, Trade Action owns trade
 creation and closing, Pricing continuously values active trades, PostgreSQL stores business
